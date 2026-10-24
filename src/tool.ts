@@ -3,7 +3,7 @@ import { z } from "zod";
 import { makePayFetch, type PayFetch } from "./client.js";
 // Core money-logic lives in a dependency-free module so it is unit-tested
 // without the AI SDK runtime. Imported with the .mjs extension on purpose.
-import { runGuard, GATE_BASE } from "./gate.mjs";
+import { runGuard, runTokenReport, GATE_BASE } from "./gate.mjs";
 
 export interface SwapGuardOptions {
   /** Pre-built x402-paying fetch; overrides `privateKey`. Mainly for tests. */
@@ -78,6 +78,63 @@ export function createSwapGuard(opts: SwapGuardOptions = {}) {
  * into `generateText({ tools: { swapGuard } })`.
  */
 export const swapGuard = createSwapGuard({
+  privateKey: typeof process !== "undefined" ? process.env?.PRIVATE_KEY : undefined,
+  base: typeof process !== "undefined" ? process.env?.SWAP_GATE_BASE_URL : undefined,
+});
+
+export interface TokenReportOptions {
+  /** Pre-built x402-paying fetch; overrides `privateKey`. Mainly for tests. */
+  payFetch?: PayFetch;
+  /** Hex private key of the agent's Base wallet; signs the $0.01 USDC x402 payment. Omit for the free preview path only. */
+  privateKey?: string;
+  /** Override the gate base URL (defaults to the hosted Grey Ridge Worker). */
+  base?: string;
+  /** Treat a token whose risk_score exceeds this (0-100) as unsafe. Default 60. */
+  maxRiskScore?: number;
+}
+
+/**
+ * Build a Vercel AI SDK tool that vets a Base ERC-20 for safety — the research
+ * / watchlist-screening companion to `swapGuard`.
+ *
+ * Wraps Grey Ridge `/chain/token-report` (honeypot + sellability sim,
+ * owner-renounce + mint/pause/blacklist/fee-setter/upgradeable-proxy checks,
+ * measured transfer tax, and Uniswap v3 WETH-pool liquidity), paid inline per
+ * call via x402 USDC ($0.01) — no API key. Use it to screen a candidate token
+ * BEFORE deciding to trade it (where `swapGuard` is the final pre-swap gate
+ * sized to a specific notional). Returns the full report plus a `safe` boolean,
+ * and fails CLOSED (`safe:false`, verdict AVOID) if the route is unreachable.
+ *
+ * ```ts
+ * import { generateText } from "ai";
+ * import { createTokenReport } from "@grey-ridge/vercel-ai-swap-gate";
+ * const tokenReport = createTokenReport({ privateKey: process.env.PRIVATE_KEY });
+ * await generateText({ model, tools: { tokenReport }, prompt: "Is 0x… worth trading on Base?" });
+ * ```
+ */
+export function createTokenReport(opts: TokenReportOptions = {}) {
+  const base = opts.base || GATE_BASE;
+  const payFetch: PayFetch = opts.payFetch || makePayFetch(opts.privateKey);
+  const maxRiskScore = opts.maxRiskScore ?? 60;
+
+  return tool({
+    description:
+      "Token-safety report for a Base ERC-20: SAFE | CAUTION | AVOID verdict with risk_score (0-100) and reasons — honeypot/sellability sim, owner-renounce + mint/pause/blacklist/fee-setter/upgradeable-proxy checks, measured transfer tax, and Uniswap v3 WETH-pool liquidity. Via Grey Ridge /chain/token-report ($0.01 USDC/call, paid inline with x402). Use to SCREEN a candidate token; returns the full report plus a `safe` boolean. Fails closed (safe:false) if the route is unreachable.",
+    inputSchema: z.object({
+      token: z
+        .string()
+        .describe("Base ERC-20 contract address (0x followed by 40 hex chars) to vet."),
+    }),
+    execute: async ({ token }: { token: string }) =>
+      runTokenReport(payFetch, { token, base }, { maxRiskScore }),
+  });
+}
+
+/**
+ * Zero-config token-report tool: reads `PRIVATE_KEY` and the optional
+ * `SWAP_GATE_BASE_URL` from the environment.
+ */
+export const tokenReport = createTokenReport({
   privateKey: typeof process !== "undefined" ? process.env?.PRIVATE_KEY : undefined,
   base: typeof process !== "undefined" ? process.env?.SWAP_GATE_BASE_URL : undefined,
 });

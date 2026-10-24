@@ -63,6 +63,59 @@ declare function runGuard(
   opts?: { maxBreakevenPct?: number; maxExitSlippagePct?: number }
 ): Promise<GuardResult>;
 
+interface TokenReportResponse {
+  token?: string;
+  chain?: string;
+  token_meta?: { symbol?: string; name?: string; decimals?: number };
+  security?: {
+    isHoneypot?: boolean;
+    sellable?: boolean;
+    transferTaxBps?: number | null;
+    taxMutable?: boolean;
+    ownerRenounced?: boolean;
+    upgradeableProxy?: boolean;
+    canMint?: boolean;
+    canPause?: boolean;
+    hasBlacklist?: boolean;
+    simStatus?: string;
+    [k: string]: unknown;
+  };
+  liquidity?: { wethPoolUsd?: number; dex?: string; [k: string]: unknown };
+  verdict?: "SAFE" | "CAUTION" | "AVOID" | string;
+  risk_score?: number;
+  reasons?: string[];
+  analyzed_at?: string;
+  disclaimer?: string;
+  [k: string]: unknown;
+}
+
+interface ReportDecision {
+  safe: boolean;
+  reasons: string[];
+}
+
+interface TokenReportResult extends TokenReportResponse {
+  safe: boolean;
+  guard_reasons: string[];
+  summary: string;
+}
+
+declare function buildReportUrl(args?: { token: string; base?: string }): string;
+declare function summarizeReport(out: TokenReportResponse | null | undefined): string;
+declare function evaluateReport(
+  out: TokenReportResponse | null | undefined,
+  opts?: { maxRiskScore?: number }
+): ReportDecision;
+declare function fetchTokenReport(
+  payFetch: (url: string) => Promise<{ ok: boolean; status: number; json(): Promise<TokenReportResponse> }>,
+  args?: { token: string; base?: string }
+): Promise<TokenReportResponse>;
+declare function runTokenReport(
+  payFetch: (url: string) => Promise<{ ok: boolean; status: number; json(): Promise<TokenReportResponse> }>,
+  args?: { token: string; base?: string },
+  opts?: { maxRiskScore?: number }
+): Promise<TokenReportResult>;
+
 type PayFetch = (url: string) => Promise<Response>;
 
 interface SwapGuardOptions {
@@ -110,5 +163,44 @@ declare const swapGuard: ai.Tool<{
     side?: "buy" | "sell";
     notional_usd?: number;
 }, GuardResult>;
+interface TokenReportOptions {
+    /** Pre-built x402-paying fetch; overrides `privateKey`. Mainly for tests. */
+    payFetch?: PayFetch;
+    /** Hex private key of the agent's Base wallet; signs the $0.01 USDC x402 payment. Omit for the free preview path only. */
+    privateKey?: string;
+    /** Override the gate base URL (defaults to the hosted Grey Ridge Worker). */
+    base?: string;
+    /** Treat a token whose risk_score exceeds this (0-100) as unsafe. Default 60. */
+    maxRiskScore?: number;
+}
+/**
+ * Build a Vercel AI SDK tool that vets a Base ERC-20 for safety — the research
+ * / watchlist-screening companion to `swapGuard`.
+ *
+ * Wraps Grey Ridge `/chain/token-report` (honeypot + sellability sim,
+ * owner-renounce + mint/pause/blacklist/fee-setter/upgradeable-proxy checks,
+ * measured transfer tax, and Uniswap v3 WETH-pool liquidity), paid inline per
+ * call via x402 USDC ($0.01) — no API key. Use it to screen a candidate token
+ * BEFORE deciding to trade it (where `swapGuard` is the final pre-swap gate
+ * sized to a specific notional). Returns the full report plus a `safe` boolean,
+ * and fails CLOSED (`safe:false`, verdict AVOID) if the route is unreachable.
+ *
+ * ```ts
+ * import { generateText } from "ai";
+ * import { createTokenReport } from "@grey-ridge/vercel-ai-swap-gate";
+ * const tokenReport = createTokenReport({ privateKey: process.env.PRIVATE_KEY });
+ * await generateText({ model, tools: { tokenReport }, prompt: "Is 0x… worth trading on Base?" });
+ * ```
+ */
+declare function createTokenReport(opts?: TokenReportOptions): ai.Tool<{
+    token: string;
+}, TokenReportResult>;
+/**
+ * Zero-config token-report tool: reads `PRIVATE_KEY` and the optional
+ * `SWAP_GATE_BASE_URL` from the environment.
+ */
+declare const tokenReport: ai.Tool<{
+    token: string;
+}, TokenReportResult>;
 
-export { GATE_BASE, type GateArgs, type GateResponse, type GuardResult, type SwapGuardOptions, type TradeDecision, buildGateUrl, createSwapGuard, swapGuard as default, evaluateTrade, extractToken, fetchGate, runGuard, summarizeGate, swapGuard };
+export { GATE_BASE, type GateArgs, type GateResponse, type GuardResult, type ReportDecision, type SwapGuardOptions, type TokenReportOptions, type TokenReportResponse, type TokenReportResult, type TradeDecision, buildGateUrl, buildReportUrl, createSwapGuard, createTokenReport, swapGuard as default, evaluateReport, evaluateTrade, extractToken, fetchGate, fetchTokenReport, runGuard, runTokenReport, summarizeGate, summarizeReport, swapGuard, tokenReport };

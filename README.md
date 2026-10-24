@@ -82,6 +82,36 @@ import { swapGuard } from "@grey-ridge/vercel-ai-swap-gate";
 await generateText({ model, tools: { swapGuard }, prompt });
 ```
 
+## Second tool: `tokenReport` (token screening)
+
+`swapGuard` is the final gate *at the moment you swap*, sized to a notional. `tokenReport` is the companion for **screening a candidate token earlier** — a research or watchlist step that answers "is this token worth trading at all?" without a trade size. It wraps `/chain/token-report` (**$0.01 USDC/call**) and returns a `SAFE | CAUTION | AVOID` verdict with `risk_score`, the full security breakdown, and a single `safe` boolean. Like the gate, it **fails closed** (`safe: false`, verdict `AVOID`) if the route is unreachable.
+
+```ts
+import { createTokenReport } from "@grey-ridge/vercel-ai-swap-gate";
+
+const tokenReport = createTokenReport({ privateKey: process.env.PRIVATE_KEY });
+
+const { text } = await generateText({
+  model: openai("gpt-4o"),
+  tools: { tokenReport },            // screen first…
+  prompt: "Is 0x4ed4e862860bed51a9570b96d89af5e1b0efefed worth trading on Base?",
+});
+```
+
+```jsonc
+{
+  "verdict": "SAFE",
+  "risk_score": 20,
+  "security": { "isHoneypot": false, "sellable": true, "ownerRenounced": false, "canPause": true },
+  "liquidity": { "wethPoolUsd": 251940 },
+  "safe": true,                          // ← branch on this
+  "guard_reasons": ["cleared — SAFE"],
+  "summary": "SAFE: risk 20/100 · liquidity $251,940 · transfers can be paused"
+}
+```
+
+A zero-config `tokenReport` is exported too (reads `PRIVATE_KEY` from env). Wire **both** tools into one agent — `tokenReport` to screen candidates, `swapGuard` to clear the actual order.
+
 ## Configure
 
 `createSwapGuard(options)`:

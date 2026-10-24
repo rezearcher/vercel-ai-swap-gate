@@ -98,6 +98,76 @@ async function runGuard(payFetch, args = {}, { maxBreakevenPct = 15, maxExitSlip
     };
   }
 }
+function buildReportUrl({ token, base = GATE_BASE } = {}) {
+  if (!ADDR_RE.test(String(token || ""))) {
+    throw new Error(`invalid Base token address: ${token}`);
+  }
+  const qs = new URLSearchParams({ token });
+  return `${base}/chain/token-report?${qs.toString()}`;
+}
+function summarizeReport(out) {
+  if (!out || typeof out !== "object") return "no token-report response";
+  const verdict = String(out.verdict || "unknown").toUpperCase();
+  const bits = [];
+  if (typeof out.risk_score === "number") bits.push(`risk ${out.risk_score}/100`);
+  const liq = out.liquidity?.wethPoolUsd;
+  if (typeof liq === "number") {
+    bits.push(`liquidity $${Math.round(liq).toLocaleString("en-US")}`);
+  }
+  if (Array.isArray(out.reasons) && out.reasons.length) {
+    bits.push(out.reasons.slice(0, 3).join("; "));
+  }
+  return `${verdict}: ${bits.join(" \xB7 ") || "no detail"}`;
+}
+function evaluateReport(out, { maxRiskScore = 60 } = {}) {
+  const reasons = [];
+  if (!out || typeof out !== "object") return { safe: false, reasons: ["no token-report response"] };
+  const verdict = String(out.verdict || "").toUpperCase();
+  const sec = out.security || {};
+  if (sec.isHoneypot === true) reasons.push("honeypot: a real wallet cannot sell this token");
+  if (sec.sellable === false) reasons.push("not sellable");
+  if (verdict === "AVOID") {
+    reasons.push(`verdict AVOID: ${(out.reasons || []).slice(0, 3).join("; ") || "high risk"}`);
+  }
+  if (typeof out.risk_score === "number" && out.risk_score > maxRiskScore) {
+    reasons.push(`risk_score ${out.risk_score} > ${maxRiskScore}`);
+  }
+  if (verdict === "CAUTION" && reasons.length === 0) {
+    reasons.push(`verdict CAUTION: ${(out.reasons || []).slice(0, 2).join("; ") || "review before trading"}`);
+  }
+  const safe = reasons.length === 0 && verdict === "SAFE";
+  return { safe, reasons: reasons.length ? reasons : ["cleared \u2014 SAFE"] };
+}
+async function fetchTokenReport(payFetch, { token, base = GATE_BASE } = {}) {
+  const url = buildReportUrl({ token, base });
+  const res = await payFetch(url);
+  if (!res.ok && res.status !== 200) {
+    throw new Error(`token-report request failed: HTTP ${res.status}`);
+  }
+  return res.json();
+}
+async function runTokenReport(payFetch, args = {}, { maxRiskScore = 60 } = {}) {
+  try {
+    const out = await fetchTokenReport(payFetch, args);
+    const ev = evaluateReport(out, { maxRiskScore });
+    return {
+      ...out,
+      safe: ev.safe,
+      guard_reasons: ev.reasons,
+      summary: summarizeReport(out)
+    };
+  } catch (err) {
+    const reason = `token-report unavailable: ${err?.message || err}; fail closed`;
+    return {
+      verdict: "AVOID",
+      risk_score: 100,
+      safe: false,
+      reason,
+      guard_reasons: ["token-report unreachable \u2014 fail closed"],
+      summary: "AVOID: token-report unreachable \u2014 fail closed"
+    };
+  }
+}
 
 // src/tool.ts
 function createSwapGuard(opts = {}) {
@@ -124,16 +194,39 @@ var swapGuard = createSwapGuard({
   privateKey: typeof process !== "undefined" ? process.env?.PRIVATE_KEY : void 0,
   base: typeof process !== "undefined" ? process.env?.SWAP_GATE_BASE_URL : void 0
 });
+function createTokenReport(opts = {}) {
+  const base = opts.base || GATE_BASE;
+  const payFetch = opts.payFetch || makePayFetch(opts.privateKey);
+  const maxRiskScore = opts.maxRiskScore ?? 60;
+  return tool({
+    description: "Token-safety report for a Base ERC-20: SAFE | CAUTION | AVOID verdict with risk_score (0-100) and reasons \u2014 honeypot/sellability sim, owner-renounce + mint/pause/blacklist/fee-setter/upgradeable-proxy checks, measured transfer tax, and Uniswap v3 WETH-pool liquidity. Via Grey Ridge /chain/token-report ($0.01 USDC/call, paid inline with x402). Use to SCREEN a candidate token; returns the full report plus a `safe` boolean. Fails closed (safe:false) if the route is unreachable.",
+    inputSchema: z.object({
+      token: z.string().describe("Base ERC-20 contract address (0x followed by 40 hex chars) to vet.")
+    }),
+    execute: async ({ token }) => runTokenReport(payFetch, { token, base }, { maxRiskScore })
+  });
+}
+var tokenReport = createTokenReport({
+  privateKey: typeof process !== "undefined" ? process.env?.PRIVATE_KEY : void 0,
+  base: typeof process !== "undefined" ? process.env?.SWAP_GATE_BASE_URL : void 0
+});
 export {
   GATE_BASE,
   buildGateUrl,
+  buildReportUrl,
   createSwapGuard,
+  createTokenReport,
   swapGuard as default,
+  evaluateReport,
   evaluateTrade,
   extractToken,
   fetchGate,
+  fetchTokenReport,
   runGuard,
+  runTokenReport,
   summarizeGate,
-  swapGuard
+  summarizeReport,
+  swapGuard,
+  tokenReport
 };
 //# sourceMappingURL=index.js.map
