@@ -28,11 +28,8 @@ Price point: **~1/25th** of pre-trade checks that bill up to $0.25/call.
 
 ```bash
 npm install @grey-ridge/vercel-ai-swap-gate ai zod
-# or with pnpm: pnpm add @grey-ridge/vercel-ai-swap-gate ai zod
-# or from git: npm install github:rezearcher/vercel-ai-swap-gate ai zod
+# or: pnpm add @grey-ridge/vercel-ai-swap-gate ai zod
 ```
-
-Published on npm as **`@grey-ridge/vercel-ai-swap-gate`**. The build is committed to the git repo too, so the git fallback needs no compile step.
 
 `ai` (Vercel AI SDK v4/v5) and `zod` are peer dependencies — the SDK you already build your agent with.
 
@@ -119,7 +116,7 @@ A zero-config `tokenReport` is exported too (reads `PRIVATE_KEY` from env). Wire
 
 | Option | Default | Purpose |
 |---|---|---|
-| `privateKey` | — | Hex key of the agent's Base wallet; signs the x402 USDC payment. Omit → free preview path only. |
+| `privateKey` | — | Hex key of the agent's Base wallet; signs the x402 USDC payment. Omit (or leave the wallet unfunded) → the guard **degrades open**: a real `proceed` from the free preview plus a fund-onramp hint in `guard_reasons`, never an opaque `402` throw. Set it to a wallet holding ~1 USDC to unlock the paid `sizing` + exit-simulation. |
 | `defaultNotionalUsd` | `100` | Default trade size for the liquidity / sizing checks when the model omits `notional_usd`. |
 | `maxBreakevenPct` | `15` | Set `proceed:false` on a `go` whose round-trip friction exceeds this %. |
 | `maxExitSlippagePct` | `10` | Set `proceed:false` on a `go` whose modelled exit slippage exceeds this %. |
