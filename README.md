@@ -27,11 +27,12 @@ Price point: **~1/25th** of pre-trade checks that bill up to $0.25/call.
 ## Install
 
 ```bash
-npm install github:rezearcher/vercel-ai-swap-gate ai zod
-# or: pnpm add github:rezearcher/vercel-ai-swap-gate ai zod
+npm install @grey-ridge/vercel-ai-swap-gate ai zod
+# or with pnpm: pnpm add @grey-ridge/vercel-ai-swap-gate ai zod
+# or from git: npm install github:rezearcher/vercel-ai-swap-gate ai zod
 ```
 
-The build is committed, so the git install needs no compile step.
+Published on npm as **`@grey-ridge/vercel-ai-swap-gate`**. The build is committed to the git repo too, so the git fallback needs no compile step.
 
 `ai` (Vercel AI SDK v4/v5) and `zod` are peer dependencies — the SDK you already build your agent with.
 
