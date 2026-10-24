@@ -32,11 +32,7 @@
   "license": "MIT",
   "author": "Grey Ridge Signals Group LLC",
   "homepage": "https://x402-data-api.sigrunner.workers.dev",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/rezearcher/x402-data-api.git",
-    "directory": "integrations/vercel-ai-sdk-swap-gate"
-  },
+  "repository": "github:rezearcher/vercel-ai-swap-gate",
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
