@@ -18,6 +18,10 @@ export {
   summarizeGate,
   evaluateTrade,
   fetchGate,
+  buildPreviewUrl,
+  fundOnrampHint,
+  fetchGatePreview,
+  fetchGateOrPreview,
   runGuard,
   buildReportUrl,
   summarizeReport,
@@ -26,7 +30,7 @@ export {
   runTokenReport,
   GATE_BASE,
 } from "./gate.mjs";
-export type { GateArgs, GateResponse, TradeDecision, GuardResult } from "./gate.mjs";
+export type { GateArgs, GateResponse, GateActivation, TradeDecision, GuardResult } from "./gate.mjs";
 export type {
   TokenReportResponse,
   ReportDecision,
