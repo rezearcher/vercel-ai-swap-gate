@@ -1,0 +1,60 @@
+{
+  "name": "@grey-ridge/vercel-ai-swap-gate",
+  "version": "0.1.0",
+  "description": "Pre-trade token-safety gate for Base trading agents (Vercel AI SDK tool): honeypot, sellability, admin-control and liquidity-vs-size checks via Grey Ridge /gate/swap, paid inline with x402 USDC ($0.008/call). Fails closed. Call before every swap.",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "keywords": [
+    "vercel-ai-sdk",
+    "ai-sdk",
+    "ai",
+    "tool",
+    "x402",
+    "base",
+    "token-safety",
+    "honeypot",
+    "pre-trade",
+    "defi",
+    "trading-agent"
+  ],
+  "license": "MIT",
+  "author": "Grey Ridge Signals Group LLC",
+  "homepage": "https://x402-data-api.sigrunner.workers.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rezearcher/vercel-ai-swap-gate.git",
+    "directory": "integrations/vercel-ai-sdk-swap-gate"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc -p tsconfig.check.json --noEmit",
+    "test": "node --test test/*.test.mjs"
+  },
+  "peerDependencies": {
+    "ai": ">=4.0.0",
+    "zod": ">=3.23.0"
+  },
+  "dependencies": {
+    "@x402/core": "^2.15.0",
+    "@x402/evm": "^2.15.0",
+    "@x402/fetch": "^2.15.0",
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "ai": "^5.0.0",
+    "zod": "^3.23.0",
+    "@types/node": "^20.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.5.0"
+  }
+}

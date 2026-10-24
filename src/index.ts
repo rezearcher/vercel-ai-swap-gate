@@ -1,0 +1,23 @@
+/**
+ * Grey Ridge pre-trade safety gate for Vercel AI SDK trading agents.
+ *
+ * `createSwapGuard()` returns an AI SDK `tool` that wraps the Base-native
+ * /gate/swap route (honeypot + sellability + admin-control + liquidity-vs-size),
+ * paid inline per call via x402 USDC ($0.008) — no API key, no subscription.
+ * `swapGuard` is a zero-config instance that reads the agent wallet key from env.
+ */
+export { createSwapGuard, swapGuard } from "./tool.js";
+export type { SwapGuardOptions } from "./tool.js";
+// Dependency-free core, re-exported for agents that want the raw primitives.
+export {
+  extractToken,
+  buildGateUrl,
+  summarizeGate,
+  evaluateTrade,
+  fetchGate,
+  runGuard,
+  GATE_BASE,
+} from "./gate.mjs";
+export type { GateArgs, GateResponse, TradeDecision, GuardResult } from "./gate.mjs";
+
+export { swapGuard as default } from "./tool.js";
