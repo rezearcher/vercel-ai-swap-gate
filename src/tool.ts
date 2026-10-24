@@ -39,6 +39,9 @@ export interface SwapGuardOptions {
 export function createSwapGuard(opts: SwapGuardOptions = {}) {
   const base = opts.base || GATE_BASE;
   const payFetch: PayFetch = opts.payFetch || makePayFetch(opts.privateKey);
+  // Whether an x402 signer is configured. When false the guard reads the free
+  // preview directly (real verdict + fund-onramp hint) instead of 402-throwing.
+  const hasKey = typeof opts.privateKey === "string" && opts.privateKey.length > 0;
   const defaultNotionalUsd =
     typeof opts.defaultNotionalUsd === "number" && opts.defaultNotionalUsd > 0
       ? opts.defaultNotionalUsd
@@ -67,7 +70,7 @@ export function createSwapGuard(opts: SwapGuardOptions = {}) {
       runGuard(
         payFetch,
         { token, side, notionalUsd: notional_usd, base },
-        { maxBreakevenPct, maxExitSlippagePct }
+        { maxBreakevenPct, maxExitSlippagePct, hasKey }
       ),
   });
 }
