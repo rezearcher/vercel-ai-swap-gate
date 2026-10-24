@@ -47,8 +47,35 @@ test("runGuard surfaces a BLOCK verdict as proceed:false", async () => {
   assert.match(r.guard_reasons[0], /BLOCK/);
 });
 
-test("runGuard FAILS CLOSED when the gate returns an unpaid 402", async () => {
-  const r = await runGuard(fakeFetch({}, { ok: false, status: 402 }), { token: USDC });
+test("runGuard DEGRADES OPEN to the free preview when the wallet is unfunded (402)", async () => {
+  // Paid side 402s (unfunded wallet); the free preview returns a real verdict,
+  // so the install still gets a GO instead of an opaque throw — plus the hint.
+  const previewBody = { decision: "go", reason: "passes checks", risk_score: 20, liquidity_usd: 300000 };
+  const previewFetch = async () => ({ ok: true, status: 200, json: async () => previewBody });
+  const r = await runGuard(fakeFetch({}, { ok: false, status: 402 }), { token: USDC }, { previewFetch });
+  assert.equal(r.proceed, true); // safety verdict still enforced, from the preview
+  assert.equal(r.decision, "go");
+  assert.equal(r.paid, false);
+  assert.ok(r.activation && r.activation.needed, "free-mode must carry an activation block");
+  assert.match(r.guard_reasons.join(" "), /FREE preview mode/);
+});
+
+test("runGuard with no key reads the preview directly (never wastes a 402 on payFetch)", async () => {
+  const previewBody = { decision: "block", reason: "honeypot: cannot sell" };
+  const previewFetch = async () => ({ ok: true, status: 200, json: async () => previewBody });
+  // payFetch must NOT be called when hasKey:false — make it throw to prove it.
+  const payFetch = async () => {
+    throw new Error("payFetch must not run without a configured key");
+  };
+  const r = await runGuard(payFetch, { token: USDC }, { hasKey: false, previewFetch });
+  assert.equal(r.proceed, false); // a preview BLOCK still blocks (degrade-open ≠ unsafe)
+  assert.equal(r.paid, false);
+  assert.ok(r.activation.needed);
+});
+
+test("runGuard FAILS CLOSED when BOTH the paid route and the preview are down (true outage)", async () => {
+  const previewFetch = async () => ({ ok: false, status: 503, json: async () => ({}) });
+  const r = await runGuard(fakeFetch({}, { ok: false, status: 402 }), { token: USDC }, { previewFetch });
   assert.equal(r.proceed, false);
   assert.equal(r.decision, "block");
   assert.match(r.reason, /fail closed/);
